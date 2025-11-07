@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Learning Machine: Video Analyzer",
+  "description": "Upload a video to get AI-powered summaries and detailed, SEO-friendly articles. This tool leverages Gemini to extract key insights and generate comprehensive content from your videos.",
+  "requestFramePermissions": []
+}
