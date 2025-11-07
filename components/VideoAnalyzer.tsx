@@ -116,29 +116,31 @@ export default function VideoAnalyzer() {
     const processInlines = (text: string) => {
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/_(.*?)_/g, '<em>$1</em>')
             .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">$1</a>')
-            .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline break-all">$1</a>');
+            .replace(/(?<!href=")(?<!href=')https?:\/\/[^\s]+/g, '<a href="$&" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline break-all">$&</a>');
     };
 
-    const blocks = markdown.replace(/```markdown\n|```/g, '').trim().split(/(\r?\n){2,}/);
+    const cleanMarkdown = markdown.replace(/```markdown\n|```/g, '').trim();
+    const blocks = cleanMarkdown.split(/(\r?\n){2,}/);
 
     return blocks.map(block => {
         const trimmedBlock = block.trim();
         if (!trimmedBlock) return '';
 
-        // Table
         if (trimmedBlock.startsWith('|')) {
-            const rows = trimmedBlock.split(/\r?\n|\r/);
+            const rows = trimmedBlock.split(/\r?\n|\r/).filter(row => row.trim().startsWith('|'));
             const separatorIndex = rows.findIndex(row => /\|(?:\s*:?-+:?\s*\|)+/.test(row));
+            
             if (separatorIndex > 0) {
                 const headers = rows[0].split('|').slice(1, -1).map(cell => cell.trim());
                 const bodyRows = rows.slice(separatorIndex + 1);
 
-                const ths = headers.map(h => `<th class="p-3 border-b border-neutral-700 text-left font-semibold bg-neutral-800/50">${h}</th>`).join('');
+                const ths = headers.map(h => `<th class="p-3 border-b border-neutral-700 text-left font-semibold bg-neutral-800/50">${processInlines(h)}</th>`).join('');
                 
                 const trs = bodyRows.map(rowStr => {
                     const cells = rowStr.split('|').slice(1, -1).map(cell => cell.trim());
-                    if (cells.length === 0) return '';
+                    if (cells.length === 0 || cells.every(c => c === '')) return '';
                     const tds = cells.map(cell => `<td class="p-3 border-b border-neutral-800 align-top">${processInlines(cell)}</td>`).join('');
                     return `<tr>${tds}</tr>`;
                 }).join('');
@@ -156,20 +158,30 @@ export default function VideoAnalyzer() {
             }
         }
         
-        // Headings
-        if (trimmedBlock.startsWith('# ')) return `<h1 class="text-2xl font-bold my-4">${processInlines(trimmedBlock.substring(2))}</h1>`;
+        if (trimmedBlock.startsWith('### ')) return `<h3 class="text-lg font-semibold my-2">${processInlines(trimmedBlock.substring(4))}</h3>`;
         if (trimmedBlock.startsWith('## ')) return `<h2 class="text-xl font-semibold my-3 border-b border-neutral-600 pb-1">${processInlines(trimmedBlock.substring(3))}</h2>`;
+        if (trimmedBlock.startsWith('# ')) return `<h1 class="text-2xl font-bold my-4">${processInlines(trimmedBlock.substring(2))}</h1>`;
         
-        // Lists
-        if (trimmedBlock.startsWith('* ') || trimmedBlock.startsWith('- ')) {
+        if (trimmedBlock.startsWith('> ')) {
+            const quoteContent = trimmedBlock.split(/\r?\n|\r/).map(line => line.replace(/^>\s?/, '')).join(' ');
+            return `<blockquote class="border-l-4 border-neutral-600 pl-4 my-4 italic text-neutral-400">${processInlines(quoteContent)}</blockquote>`;
+        }
+
+        if (trimmedBlock.match(/^(\*|-)\s/)) {
             const items = trimmedBlock.split(/\r?\n|\r/).map(item => {
                 const content = item.replace(/^\s*[-*]\s*/, '');
                 return `<li class="pb-1">${processInlines(content)}</li>`;
             }).join('');
             return `<ul class="list-disc list-inside space-y-1 my-2">${items}</ul>`;
         }
+        if (trimmedBlock.match(/^\d+\.\s/)) {
+            const items = trimmedBlock.split(/\r?\n|\r/).map(item => {
+                const content = item.replace(/^\s*\d+\.\s*/, '');
+                return `<li class="pb-1">${processInlines(content)}</li>`;
+            }).join('');
+            return `<ol class="list-decimal list-inside space-y-1 my-2">${items}</ol>`;
+        }
 
-        // Paragraphs
         return `<p>${processInlines(trimmedBlock).replace(/\n/g, '<br />')}</p>`;
     }).join('');
   };
